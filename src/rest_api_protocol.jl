@@ -31,17 +31,18 @@ function StandardHeaders(; kwargs...)
     obj
 end
 
-struct ServiceRequest
+struct ServiceRequest{T}
     account::String
     verb::String
     resource::String
     standard_headers::StandardHeaders
     headers::Dict{String,String}
+    body::T
 
-    function ServiceRequest(account::String, verb::String, resource::String; headers...)
+    function ServiceRequest{T}(account::String, verb::String, resource::String, body::T; headers...) where T
         hdrdate = Dates.format(now(Dates.UTC), Dates.RFC1123Format)
         endswith(hdrdate, "GMT") || (hdrdate *= " GMT")
-    
+
         reqhdrs = Dict{String,String}("x-ms-date"=>hdrdate, "x-ms-version"=>API_VER)
         stdhdrparams = Dict{Symbol,String}()
         for (n,v) in headers
@@ -55,8 +56,12 @@ struct ServiceRequest
         (verb == "PUT") && (reqhdrs["Content-Length"] = "0")
         stdhdr = StandardHeaders(; stdhdrparams...)
 
-        new(account, verb, resource, stdhdr, reqhdrs)
+        new(account, verb, resource, stdhdr, reqhdrs, body)
     end
+end
+
+function ServiceRequest(account::String, verb::String, resource::String; headers...)
+    return ServiceRequest{Nothing}(account, verb, resource, nothing; headers...)
 end
 
 to_http_header_name(n::Symbol) = join(map(ucfirst, split(string(n), '_')), '-')
@@ -67,6 +72,10 @@ sign_hdr(nv::Pair{T1,T2}) where {T1<:AbstractString, T2<:AbstractString} = sign_
 
 function sign_sharedkey(req::ServiceRequest, key::String)
     iob = IOBuffer()
+
+    if req.body != nothing
+        print(iob, req.body)
+    end
 
     println(iob, req.verb)
 
@@ -114,7 +123,11 @@ function execute(req::ServiceRequest, key::String; retry_count::Int=0, retry_int
     while !success && count <= retry_count
         count += 1
         (count == 1) || sleep(retry_interval)
-        resp = HTTP.request(uppercase(req.verb), HTTP.URIs.URI(req.resource), req.headers; DEFAULT_KWARGS...)
+        if req.body != nothing
+            resp = HTTP.request(uppercase(req.verb), HTTP.URIs.URI(req.resource), req.headers, req.body; DEFAULT_KWARGS...)
+        else
+            resp = HTTP.request(uppercase(req.verb), HTTP.URIs.URI(req.resource), req.headers; DEFAULT_KWARGS...)
+        end
         success = (200 <= resp.status <= 206)
         success && (return resp)
         @warn("Storage service request failed. ", resp)
