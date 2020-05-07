@@ -20,6 +20,7 @@ function putResource(storage_account, storage_key, uri, content; kwargs...)
     return resp
 end
 
+
 function extract_account_and_key(ctx, subscription_id::String, resource_group_name::String, diskuri::String)
     # find the storage account
     storage_account = String(split(split(diskuri, "/")[3], '.'; limit=2)[1])
