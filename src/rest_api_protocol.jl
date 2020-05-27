@@ -63,12 +63,21 @@ struct ServiceRequest{T}
     headers::Dict{String,String}
     body::T
 
-    function ServiceRequest{T}(account::String, verb::String, resource::String, body::T) where T
+    function ServiceRequest{T}(
+        account::String,
+        verb::String,
+        resource::String,
+        body::T,
+        userheaders::Union{Nothing,Dict{String,String}}=nothing
+    ) where T
         hdrdate = Dates.format(now(Dates.UTC), Dates.RFC1123Format)
         endswith(hdrdate, "GMT") || (hdrdate *= " GMT")
 
         reqhdrs = Dict{String,String}("x-ms-date"=>hdrdate,
                                       "x-ms-version"=>API_VER)
+        if userheaders !== nothing
+            merge!(reqhdrs, userheaders)
+        end
 
         stdhdr = StandardHeaders()
 
@@ -82,8 +91,13 @@ struct ServiceRequest{T}
     end
 end
 
-function ServiceRequest(account::String, verb::String, resource::String)
-    return ServiceRequest{Nothing}(account, verb, resource, nothing)
+function ServiceRequest(
+    account::String,
+    verb::String,
+    resource::String,
+    userheaders::Union{Nothing,Dict{String,String}}=nothing
+)
+    return ServiceRequest{Nothing}(account, verb, resource, nothing, userheaders)
 end
 
 to_http_header_name(n::Symbol) = join(map(ucfirst, split(string(n), '_')), '-')
