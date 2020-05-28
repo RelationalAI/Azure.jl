@@ -62,33 +62,33 @@ struct ServiceRequest{T}
     standard_headers::StandardHeaders
     headers::Dict{String,String}
     body::T
+end
 
-    function ServiceRequest{T}(
-        account::String,
-        verb::String,
-        resource::String,
-        body::T,
-        userheaders::Union{Nothing,Dict{String,String}}=nothing
-    ) where T
-        hdrdate = Dates.format(now(Dates.UTC), Dates.RFC1123Format)
-        endswith(hdrdate, "GMT") || (hdrdate *= " GMT")
+function ServiceRequest(
+    account::String,
+    verb::String,
+    resource::String,
+    body::T,
+    userheaders::Union{Nothing,Dict{String,String}}=nothing
+) where T
+    hdrdate = Dates.format(now(Dates.UTC), Dates.RFC1123Format)
+    endswith(hdrdate, "GMT") || (hdrdate *= " GMT")
 
-        reqhdrs = Dict{String,String}("x-ms-date"=>hdrdate,
-                                      "x-ms-version"=>API_VER)
-        if userheaders !== nothing
-            merge!(reqhdrs, userheaders)
-        end
-
-        stdhdr = StandardHeaders()
-
-        if verb == "PUT"
-            stdhdr.content_length = "$(length(body))"
-            stdhdr.content_type = "text/plain; charset=UTF-8"
-            reqhdrs["x-ms-blob-type"] = "BlockBlob"
-        end
-
-        new(account, verb, resource, stdhdr, reqhdrs, body)
+    reqhdrs = Dict{String,String}("x-ms-date"=>hdrdate,
+                                  "x-ms-version"=>API_VER)
+    if userheaders !== nothing
+        merge!(reqhdrs, userheaders)
     end
+
+    stdhdr = StandardHeaders()
+
+    if verb == "PUT"
+        stdhdr.content_length = "$(length(body))"
+        stdhdr.content_type = "text/plain; charset=UTF-8"
+        reqhdrs["x-ms-blob-type"] = "BlockBlob"
+    end
+
+    return ServiceRequest(account, verb, resource, stdhdr, reqhdrs, body)
 end
 
 function ServiceRequest(
@@ -97,7 +97,7 @@ function ServiceRequest(
     resource::String,
     userheaders::Union{Nothing,Dict{String,String}}=nothing
 )
-    return ServiceRequest{Nothing}(account, verb, resource, nothing, userheaders)
+    return ServiceRequest(account, verb, resource, nothing, userheaders)
 end
 
 to_http_header_name(n::Symbol) = join(map(ucfirst, split(string(n), '_')), '-')
