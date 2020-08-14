@@ -22,30 +22,6 @@ mutable struct StandardHeaders
     if_unmodified_since::Union{String,Nothing}
     range::Union{String,Nothing}
 end
-function Base.convert(::Type{Dict{String,String}}, x::StandardHeaders)
-    converter = Dict(:content_encoding => "Content-Encoding",
-                     :content_language => "Content-Language",
-                     :content_length => "Content-Length",
-                     :content_md5 => "Content-MD5",
-                     :content_type => "Content-Type",
-                     :date => "Date",
-                     :if_modified_since => "If-Modified-Since",
-                     :if_match => "If-Match",
-                     :if_none_match => "If-None-Match",
-                     :if_unmodified_since => "If-Unmodified-Since",
-                     :range => "Range")
-
-    converted = Dict()
-
-    for n in fieldnames(StandardHeaders)
-        v = getfield(x, n)
-        if v !== nothing
-            converted[converter[n]] = v
-        end
-    end
-
-    return converted
-end
 
 function StandardHeaders(; kwargs...)
     obj = StandardHeaders(nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
@@ -61,30 +37,26 @@ struct ServiceRequest
     resource::String
     standard_headers::StandardHeaders
     headers::Dict{String,String}
-    body::Union{Vector{UInt8},Nothing}
 
-    function ServiceRequest(account::String, verb::String, resource::String, body::Union{Vector{UInt8},Nothing}=nothing)
+    function ServiceRequest(account::String, verb::String, resource::String; headers...)
         hdrdate = Dates.format(now(Dates.UTC), Dates.RFC1123Format)
         endswith(hdrdate, "GMT") || (hdrdate *= " GMT")
-
-        reqhdrs = Dict{String,String}("x-ms-date"=>hdrdate,
-                                      "x-ms-version"=>API_VER)
-
-        stdhdr = StandardHeaders()
-
-        if verb == "PUT"
-            stdhdr.content_length = "$(sizeof(body))"
-            stdhdr.content_type = "text/plain; charset=UTF-8"
-            reqhdrs["x-ms-blob-type"] = "BlockBlob"
+    
+        reqhdrs = Dict{String,String}("x-ms-date"=>hdrdate, "x-ms-version"=>API_VER)
+        stdhdrparams = Dict{Symbol,String}()
+        for (n,v) in headers
+            if (n in fieldnames(StandardHeaders))
+                stdhdrparams[n] = v
+                reqhdrs[to_http_header_name(n)] = v
+            else
+                reqhdrs[string(n)] = v
+            end
         end
+        (verb == "PUT") && (reqhdrs["Content-Length"] = "0")
+        stdhdr = StandardHeaders(; stdhdrparams...)
 
-        new(account, verb, resource, stdhdr, reqhdrs, body)
+        new(account, verb, resource, stdhdr, reqhdrs)
     end
-end
-
-function ServiceRequest(account::String, verb::String, resource::String, body::String)
-    bytes = unsafe_wrap(Vector{UInt8}, pointer(body), (length(body),))
-    return ServiceRequest(account, verb, resource, bytes)
 end
 
 to_http_header_name(n::Symbol) = join(map(ucfirst, split(string(n), '_')), '-')
@@ -113,7 +85,6 @@ function sign_sharedkey(req::ServiceRequest, key::String)
     print(iob, canonicalize_resource(req.account, req.resource))
 
     signingstr = String(take!(iob))
-
     hmacsign = base64encode(digest(MD_SHA256, signingstr, base64decode(key)))
     req.headers["Authorization"] = "SharedKey $(req.account):$(hmacsign)"
     nothing
@@ -143,14 +114,7 @@ function execute(req::ServiceRequest, key::String; retry_count::Int=0, retry_int
     while !success && count <= retry_count
         count += 1
         (count == 1) || sleep(retry_interval)
-
-        merged = merge(req.headers, convert(Dict{String,String}, req.standard_headers))
-
-        if req.body != nothing
-            resp = HTTP.request(uppercase(req.verb), HTTP.URIs.URI(req.resource), merged, req.body; DEFAULT_KWARGS...)
-        else
-            resp = HTTP.request(uppercase(req.verb), HTTP.URIs.URI(req.resource), merged; DEFAULT_KWARGS...)
-        end
+        resp = HTTP.request(uppercase(req.verb), HTTP.URIs.URI(req.resource), req.headers; DEFAULT_KWARGS...)
         success = (200 <= resp.status <= 206)
         success && (return resp)
         @warn("Storage service request failed. ", resp)
