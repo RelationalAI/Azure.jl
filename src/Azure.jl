@@ -24,11 +24,6 @@ include("DataLakeStore/DataLakeStoreFileSystemManagementClient/DataLakeStoreFile
 _module_versions[DataLakeStoreFileSystemManagementClient] = "2016-11-01"
 _api_versions[DataLakeStoreFileSystemManagementClient.FileSystemApi] = "2016-11-01"
 
-include("Storage/Blob/Blob.jl")
-_module_versions[Blob] = "2019-06-01"
-_api_versions[Blob.BlobContainersApi] = "2019-06-01"
-_api_versions[Blob.BlobServiceApi] = "2019-06-01"
-
 include("Storage/StorageManagementClient/StorageManagementClient.jl")
 _module_versions[StorageManagementClient] = "2017-06-01"
 _api_versions[StorageManagementClient.OperationsApi] = "2017-06-01"
