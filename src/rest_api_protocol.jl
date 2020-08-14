@@ -22,30 +22,6 @@ mutable struct StandardHeaders
     if_unmodified_since::Union{String,Nothing}
     range::Union{String,Nothing}
 end
-function Base.convert(::Type{Dict{String,String}}, x::StandardHeaders)
-    converter = Dict(:content_encoding => "Content-Encoding",
-                     :content_language => "Content-Language",
-                     :content_length => "Content-Length",
-                     :content_md5 => "Content-MD5",
-                     :content_type => "Content-Type",
-                     :date => "Date",
-                     :if_modified_since => "If-Modified-Since",
-                     :if_match => "If-Match",
-                     :if_none_match => "If-None-Match",
-                     :if_unmodified_since => "If-Unmodified-Since",
-                     :range => "Range")
-
-    converted = Dict()
-
-    for n in fieldnames(StandardHeaders)
-        v = getfield(x, n)
-        if v !== nothing
-            converted[converter[n]] = v
-        end
-    end
-
-    return converted
-end
 
 function StandardHeaders(; kwargs...)
     obj = StandardHeaders(nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)

@@ -6,21 +6,6 @@ function deleteResource(ctx, subscription_id::String, resource_group_name::Strin
     Azure.REST.issuccess(resp)
 end
 
-function getResource(storage_account, storage_key, uri; kwargs...)
-    req = Azure.REST.ServiceRequest(storage_account, "GET", uri)
-    resp = Azure.REST.execute(req, storage_key; kwargs...)
-    @assert Azure.REST.issuccess(resp)
-    return resp.body
-end
-
-function putResource(storage_account, storage_key, uri, content; kwargs...)
-    ContentType = typeof(content)
-    req = Azure.REST.ServiceRequest{ContentType}(storage_account, "PUT", uri, content)
-    resp = Azure.REST.execute(req, storage_key; kwargs...)
-    return resp
-end
-
-
 function extract_account_and_key(ctx, subscription_id::String, resource_group_name::String, diskuri::String)
     # find the storage account
     storage_account = String(split(split(diskuri, "/")[3], '.'; limit=2)[1])
